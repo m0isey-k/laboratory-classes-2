@@ -1,97 +1,49 @@
+const express = require('express');
 const fileSystem = require("fs");
+const path = require('path');
+const bodyParser = require('body-parser');  
 const { STATUS_CODE } = require("../constants/statusCode");
+const { renderNewProductPage } = require('../views/renderNewProductPage'); 
 
-const productRouting = (request, response) => {
-  const { url, method } = request;
+const router = express.Router();
 
-  if (url.includes("add") && method === "GET") {
-    return renderAddProductPage(response);
-  }
 
-  if (url.includes("add") && method === "POST") {
-    return addNewProduct(request, response);
-  }
+router.use(bodyParser.urlencoded({ extended: true }));
 
-  if (url.includes("new")) {
-    return renderNewProductPage(response);
-  }
 
-  console.warn(`ERROR: requested url ${url} doesn't exist.`);
-  return;
-};
+router.get('/add', (req, res) => {
+  res.sendFile(path.join(__dirname, '../views', 'add-product.html'));
+});
 
-const renderAddProductPage = (response) => {
-  response.setHeader("Content-Type", "text/html");
-  response.write("<html>");
-  response.write("<head><title>Shop - Add product</title></head>");
-  response.write("<body>");
-  response.write("<h1>Add product</h1>");
-  response.write("<form action='/product/add' method='POST'>");
-  response.write(
-    "<br /><label>Name<br /><input type='text' name='name'></label>"
+
+router.post('/add', (req, res) => {
+  const { name, description } = req.body; 
+
+
+  fileSystem.appendFile(
+    path.join(__dirname, '../product.txt'),
+    `${name}, ${description}\n`,
+    (err) => {
+      if (err) {
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).send("Error saving product");
+      }
+
+      res.statusCode = STATUS_CODE.FOUND;
+      res.setHeader("Location", "/product/new");  
+      res.end();
+    }
   );
-  response.write(
-    "<br /><label>Description<br /><input type='text' name='description'></label>"
-  );
-  response.write("<br /><button type='submit'>Add</button>");
-  response.write("</form>");
-  response.write(
-    "<nav><a href='/'>Home</a><br /><a href='/product/new'>Newest product</a><br /><a href='/logout'>Logout</a></nav>"
-  );
-  response.write("</body>");
-  response.write("</html>");
+});
 
-  return response.end();
-};
 
-const renderNewProductPage = (response) => {
-  fileSystem.readFile("./product.txt", "utf-8", (err, data) => {
-    response.setHeader("Content-Type", "text/html");
-    response.write("<html>");
-    response.write("<head><title>Shop - Newest product</title></head>");
-    response.write("<body>");
-    response.write("<h1>Newest product</h1>");
-    response.write(
-      "<nav><a href='/'>Home</a><br /><a href='/product/add'>Add product</a><br /><a href='/logout'>Logout</a></nav>"
-    );
-
+router.get('/new', (req, res) => {
+  fileSystem.readFile(path.join(__dirname, '../product.txt'), 'utf-8', (err, data) => {
     if (err) {
-      response.write("<br /><div>No new products available.</div>");
-    } else {
-      response.write(`<br /><div>New product data - ${splittedData}</div>`);
+      return res.status(STATUS_CODE.NOT_FOUND).send("No products found");
     }
 
-    response.write("</body>");
-    response.write("</html>");
-
-    return response.end();
+    res.send(renderNewProductPage(data));  
   });
-};
+});
 
-const addNewProduct = (request, response) => {
-  const body = [];
-  request.on("data", (chunk) => {
-    body.push(chunk);
-  });
-  request.on("end", () => {
-    const parsedBody = Buffer.concat(body).toString();
-    const formData = parsedBody.split("&").map((entry) => {
-      const [key, value] = entry.split("=");
-
-      return `${key}: ${decodeURIComponent(value)}`;
-    });
-
-    fileSystem.writeFile(
-      "product.txt",
-      `${formData[0]}, ${formData[1]}`,
-      (err) => {
-        response.statusCode = STATUS_CODE.FOUND;
-        response.setHeader("Location", "/product/new");
-
-        return response.end();
-      }
-    );
-  });
-};
-
-module.exports = { productRouting };
+module.exports = router;

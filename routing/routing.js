@@ -2,6 +2,8 @@ const { homeRouting } = require("./home");
 const { productRouting } = require("./product");
 const { logoutRouting } = require("./logout");
 const { STATUS_CODE } = require("../constants/statusCode");
+const { getInfoLog, getErrorLog, getProcessLog } = require("../utils/logger");
+
 
 const requestRouting = (request, response) => {
   const { url, method } = request;
@@ -42,4 +44,4 @@ const requestRouting = (request, response) => {
   );
 };
 
-module.exports = { requestRouting };
+module.exports = router;
